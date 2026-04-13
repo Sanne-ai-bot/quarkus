@@ -2,6 +2,8 @@ package io.quarkus.deployment.jvm;
 
 import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.Instrumentation;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.security.ProtectionDomain;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -13,6 +15,7 @@ import java.util.concurrent.CopyOnWriteArraySet;
 
 import org.jboss.logging.Logger;
 
+import io.quarkus.deployment.builditem.ModuleEnableNativeAccessBuildItem;
 import io.quarkus.deployment.builditem.ModuleOpenBuildItem;
 
 final class AgentBasedModulesReconfigurer implements JvmModulesReconfigurer {
@@ -82,6 +85,56 @@ final class AgentBasedModulesReconfigurer implements JvmModulesReconfigurer {
         //Now that we have a map of openings for each module, let's instrument each of them
         for (Map.Entry<Module, PerModuleOpenInstructions> entry : aggregateByModule.entrySet()) {
             addOpens(entry.getKey(), entry.getValue().modulesToOpenToByPackage);
+        }
+    }
+
+    @Override
+    public void enableNativeAccess(List<ModuleEnableNativeAccessBuildItem> nativeAccesses,
+            ModulesClassloaderContext modulesContext) {
+        if (nativeAccesses.isEmpty())
+            return;
+        // We need to access jdk.internal.access.SharedSecrets to get the JavaLangAccess instance,
+        // which provides addEnableNativeAccess(Module). Since this package is not exported from java.base,
+        // we use Instrumentation.redefineModule to export it to our unnamed module first.
+        final Module javaBase = Module.class.getModule();
+        final Module ourModule = AgentBasedModulesReconfigurer.class.getModule();
+        try {
+            instrumentation.redefineModule(
+                    javaBase,
+                    Set.of(),
+                    Map.of("jdk.internal.access", Set.of(ourModule)),
+                    Map.of(),
+                    Set.of(),
+                    Map.of());
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to export jdk.internal.access from java.base", e);
+        }
+        // Now reflectively access SharedSecrets.getJavaLangAccess() to enable native access.
+        // For unnamed modules, the JDK uses a singleton ALL_UNNAMED_MODULE sentinel to check
+        // native access (see Module.moduleForNativeAccess()), so we must call
+        // addEnableNativeAccessToAllUnnamed() instead of addEnableNativeAccess(Module).
+        try {
+            final Class<?> sharedSecretsClass = Class.forName("jdk.internal.access.SharedSecrets");
+            final Method getJavaLangAccess = sharedSecretsClass.getMethod("getJavaLangAccess");
+            final Object jla = getJavaLangAccess.invoke(null);
+            final Class<?> jlaClass = Class.forName("jdk.internal.access.JavaLangAccess");
+            final Method addEnableNativeAccess = jlaClass.getMethod("addEnableNativeAccess", Module.class);
+            final Method addEnableNativeAccessToAllUnnamed = jlaClass.getMethod("addEnableNativeAccessToAllUnnamed");
+            boolean allUnnamedDone = false;
+            for (ModuleEnableNativeAccessBuildItem nativeAccess : nativeAccesses) {
+                final Module module = modulesContext.findModule(nativeAccess.moduleName());
+                if (module.isNamed()) {
+                    addEnableNativeAccess.invoke(jla, module);
+                    logger.debugf("Successfully enabled native access for module %s", module.getName());
+                } else if (!allUnnamedDone) {
+                    addEnableNativeAccessToAllUnnamed.invoke(jla);
+                    allUnnamedDone = true;
+                    logger.debug("Successfully enabled native access for all unnamed modules");
+                }
+            }
+        } catch (ClassNotFoundException | NoSuchMethodException | IllegalAccessException
+                | InvocationTargetException e) {
+            throw new RuntimeException("Failed to enable native access via SharedSecrets/JavaLangAccess", e);
         }
     }
 

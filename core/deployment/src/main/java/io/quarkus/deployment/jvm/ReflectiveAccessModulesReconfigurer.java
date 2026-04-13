@@ -9,6 +9,7 @@ import java.util.List;
 
 import org.jboss.logging.Logger;
 
+import io.quarkus.deployment.builditem.ModuleEnableNativeAccessBuildItem;
 import io.quarkus.deployment.builditem.ModuleOpenBuildItem;
 
 /**
@@ -28,9 +29,14 @@ final class ReflectiveAccessModulesReconfigurer implements JvmModulesReconfigure
 
     private static final Logger logger = JVMDeploymentLogger.logger;
     private final MethodHandle implAddOpensHandle;
+    private final MethodHandle implAddEnableNativeAccessHandle;
+    private final MethodHandle addEnableNativeAccessToAllUnnamedHandle;
 
     ReflectiveAccessModulesReconfigurer() {
-        implAddOpensHandle = methodHandleInit();
+        final MethodHandles.Lookup privilegedLookup = acquirePrivilegedLookup();
+        implAddOpensHandle = findImplAddOpens(privilegedLookup);
+        implAddEnableNativeAccessHandle = findImplAddEnableNativeAccess(privilegedLookup);
+        addEnableNativeAccessToAllUnnamedHandle = findAddEnableNativeAccessToAllUnnamed(privilegedLookup);
     }
 
     @Override
@@ -47,38 +53,87 @@ final class ReflectiveAccessModulesReconfigurer implements JvmModulesReconfigure
     }
 
     /**
-     * Attempts to get a handle to the private implAddOpens method of Module;
-     * this is normally sealed, so it MUST be run with: --add-opens=java.base/java.lang.invoke=ALL-UNNAMED
-     * Once we have it, we have full access to reconfigure other modules.
+     * Acquires the super-privileged MethodHandles.Lookup instance (IMPL_LOOKUP):
+     * this is necessary to access otherwise sealed private methods.
+     * This MUST be run with: --add-opens=java.base/java.lang.invoke=ALL-UNNAMED
      */
-    private static MethodHandle methodHandleInit() {
-        final MethodHandle handle;
+    private static MethodHandles.Lookup acquirePrivilegedLookup() {
         try {
-            //Get the super-privileged MethodHandles.Lookup instance (IMPL_LOOKUP):
-            //this is necessary to access the otherwise sealed private implAddOpens method.
             Field lookupField = MethodHandles.Lookup.class.getDeclaredField("IMPL_LOOKUP");
-
             //This setAccessible call is the part that would fail when the java.base module is not opened.
             lookupField.setAccessible(true);
+            return (MethodHandles.Lookup) lookupField.get(null);
+        } catch (NoSuchFieldException | IllegalAccessException | InaccessibleObjectException e) {
+            throw new RuntimeException("Failed to acquire privileged MethodHandles.Lookup. " +
+                    "This must be run with JVM parameter '--add-opens=java.base/java.lang.invoke=ALL-UNNAMED'", e);
+        }
+    }
 
-            MethodHandles.Lookup privilegedLookup = (MethodHandles.Lookup) lookupField.get(null);
-
-            //Signature of the method we want to find
+    /**
+     * Finds the private Module#implAddOpens(String, Module) method.
+     */
+    private static MethodHandle findImplAddOpens(MethodHandles.Lookup privilegedLookup) {
+        try {
             MethodType methodType = MethodType.methodType(void.class, String.class, Module.class);
-
-            //Use the privileged lookup to find the private method
-            handle = privilegedLookup.findVirtual(
-                    Module.class, // Class to find the method in
-                    "implAddOpens", // Name of the private method
-                    methodType // Signature of the method
-            );
-
+            MethodHandle handle = privilegedLookup.findVirtual(Module.class, "implAddOpens", methodType);
             logger.debug("Successfully acquired MethodHandle for implAddOpens.");
             return handle;
+        } catch (NoSuchMethodException | IllegalAccessException e) {
+            throw new RuntimeException("Failed to acquire handle to Module#implAddOpens", e);
+        }
+    }
 
-        } catch (NoSuchFieldException | IllegalAccessException | NoSuchMethodException | InaccessibleObjectException e) {
-            throw new RuntimeException("Failed to acquire handle to Module#implAddOpens. " +
-                    "This must be run with JVM parameter '--add-opens=java.base/java.lang.invoke=ALL-UNNAMED'", e);
+    /**
+     * Finds the private Module#implAddEnableNativeAccess() instance method.
+     * This method sets the enableNativeAccess flag on a specific Module, allowing it to
+     * call restricted methods (JNI, FFM) without warnings or errors.
+     * Used for named modules.
+     */
+    private static MethodHandle findImplAddEnableNativeAccess(MethodHandles.Lookup privilegedLookup) {
+        try {
+            MethodType methodType = MethodType.methodType(Module.class);
+            MethodHandle handle = privilegedLookup.findVirtual(Module.class, "implAddEnableNativeAccess", methodType);
+            logger.debug("Successfully acquired MethodHandle for implAddEnableNativeAccess.");
+            return handle;
+        } catch (NoSuchMethodException | IllegalAccessException e) {
+            throw new RuntimeException("Failed to acquire handle to Module#implAddEnableNativeAccess", e);
+        }
+    }
+
+    /**
+     * Finds the package-private static Module.addEnableNativeAccessToAllUnnamed() method.
+     * For unnamed modules, the JDK checks a singleton ALL_UNNAMED_MODULE sentinel rather than
+     * individual unnamed module instances, so we need this static method to enable native access
+     * for all unnamed modules at once.
+     */
+    private static MethodHandle findAddEnableNativeAccessToAllUnnamed(MethodHandles.Lookup privilegedLookup) {
+        try {
+            MethodType methodType = MethodType.methodType(void.class);
+            MethodHandle handle = privilegedLookup.findStatic(Module.class, "addEnableNativeAccessToAllUnnamed", methodType);
+            logger.debug("Successfully acquired MethodHandle for addEnableNativeAccessToAllUnnamed.");
+            return handle;
+        } catch (NoSuchMethodException | IllegalAccessException e) {
+            throw new RuntimeException("Failed to acquire handle to Module#addEnableNativeAccessToAllUnnamed", e);
+        }
+    }
+
+    @Override
+    public void enableNativeAccess(List<ModuleEnableNativeAccessBuildItem> nativeAccesses,
+            ModulesClassloaderContext modulesContext) {
+        if (nativeAccesses.isEmpty())
+            return;
+        boolean allUnnamedDone = false;
+        for (ModuleEnableNativeAccessBuildItem nativeAccess : nativeAccesses) {
+            final Module module = modulesContext.findModule(nativeAccess.moduleName());
+            if (module.isNamed()) {
+                enableNativeAccessOnModule(module);
+            } else if (!allUnnamedDone) {
+                // For unnamed modules, the JDK uses a singleton ALL_UNNAMED_MODULE sentinel
+                // to check native access (see Module.moduleForNativeAccess()), so we need to
+                // enable it via the static addEnableNativeAccessToAllUnnamed() method.
+                enableNativeAccessForAllUnnamed();
+                allUnnamedDone = true;
+            }
         }
     }
 
@@ -97,6 +152,34 @@ final class ReflectiveAccessModulesReconfigurer implements JvmModulesReconfigure
         } catch (Throwable e) {
             // MethodHandle.invokeExact throws Throwable
             throw new RuntimeException("Failed to invoke implAddOpens", e);
+        }
+    }
+
+    /**
+     * Uses the MethodHandle to enable native access for a named module.
+     *
+     * @param module The named module to enable native access for
+     */
+    private void enableNativeAccessOnModule(Module module) {
+        try {
+            Module ignored = (Module) implAddEnableNativeAccessHandle.invokeExact(module);
+            logger.debugf("Successfully enabled native access for module %s", module.getName());
+        } catch (Throwable e) {
+            // MethodHandle.invokeExact throws Throwable
+            throw new RuntimeException("Failed to invoke implAddEnableNativeAccess on module " + module.getName(), e);
+        }
+    }
+
+    /**
+     * Enables native access for all unnamed modules by calling the static
+     * Module.addEnableNativeAccessToAllUnnamed() method.
+     */
+    private void enableNativeAccessForAllUnnamed() {
+        try {
+            addEnableNativeAccessToAllUnnamedHandle.invokeExact();
+            logger.debug("Successfully enabled native access for all unnamed modules");
+        } catch (Throwable e) {
+            throw new RuntimeException("Failed to invoke addEnableNativeAccessToAllUnnamed", e);
         }
     }
 

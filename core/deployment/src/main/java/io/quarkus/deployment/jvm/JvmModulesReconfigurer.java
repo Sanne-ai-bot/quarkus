@@ -6,6 +6,7 @@ import java.util.List;
 import org.jboss.logging.Logger;
 
 import io.quarkus.changeagent.ClassChangeAgent;
+import io.quarkus.deployment.builditem.ModuleEnableNativeAccessBuildItem;
 import io.quarkus.deployment.builditem.ModuleOpenBuildItem;
 import net.bytebuddy.agent.ByteBuddyAgent;
 
@@ -17,6 +18,23 @@ import net.bytebuddy.agent.ByteBuddyAgent;
 public interface JvmModulesReconfigurer {
 
     void openJavaModules(List<ModuleOpenBuildItem> addOpens, ModulesClassloaderContext referenceClassloader);
+
+    /**
+     * Enables native access for the modules identified by the given build items.
+     * This is necessary to avoid warnings (and future errors) from JDK 25+ when
+     * libraries use JNI or the Foreign Function &amp; Memory API.
+     * <p>
+     * The default implementation logs a warning for each module that could not be reconfigured;
+     * concrete implementations should override this when they have a mechanism to enable native access.
+     */
+    default void enableNativeAccess(List<ModuleEnableNativeAccessBuildItem> nativeAccesses,
+            ModulesClassloaderContext modulesContext) {
+        for (ModuleEnableNativeAccessBuildItem nativeAccess : nativeAccesses) {
+            JVMDeploymentLogger.logger.warnf(
+                    "Could not enable native access for module %s: no suitable JVM reconfiguration strategy is available",
+                    nativeAccess.moduleName());
+        }
+    }
 
     /**
      * Thread-safe lazy holder for the singleton instance: this is expensive to create and tied to the JVM,

@@ -2,6 +2,7 @@ package io.quarkus.deployment.jvm;
 
 import java.util.List;
 
+import io.quarkus.deployment.builditem.ModuleEnableNativeAccessBuildItem;
 import io.quarkus.deployment.builditem.ModuleOpenBuildItem;
 
 /**
@@ -17,9 +18,19 @@ final class FallbackModulesReconfigurer implements JvmModulesReconfigurer {
     public void openJavaModules(final List<ModuleOpenBuildItem> addOpens, ModulesClassloaderContext ignored) {
         for (ModuleOpenBuildItem addOpen : addOpens) {
             JVMDeploymentLogger.logger.warnf(
-                    "FallbackModulesReconfigurer: Could not apply and add-opens for module %s/%s, to module %s",
+                    "FallbackModulesReconfigurer: Could not apply add-opens for module %s/%s, to module %s",
                     addOpen.openedModuleName(), addOpen.packageNames(),
                     addOpen.openingModuleName());
+        }
+    }
+
+    @Override
+    public void enableNativeAccess(List<ModuleEnableNativeAccessBuildItem> nativeAccesses,
+            ModulesClassloaderContext modulesContext) {
+        for (ModuleEnableNativeAccessBuildItem nativeAccess : nativeAccesses) {
+            JVMDeploymentLogger.logger.warnf(
+                    "FallbackModulesReconfigurer: Could not enable native access for module %s",
+                    nativeAccess.moduleName());
         }
     }
 

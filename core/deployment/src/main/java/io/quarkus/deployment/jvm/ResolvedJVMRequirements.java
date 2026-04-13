@@ -63,10 +63,15 @@ public final class ResolvedJVMRequirements extends SimpleBuildItem {
 
     public void applyJavaModuleConfigurationToRuntime(JvmModulesReconfigurer reconfigurer,
             ClassLoader referenceClassloader) {
-        if (addOpens.isEmpty())
+        if (addOpens.isEmpty() && enableNativeAccesses.isEmpty())
             return;
         ModulesClassloaderContext context = new ModulesClassloaderContext(referenceClassloader);
-        reconfigurer.openJavaModules(addOpens, context);
+        if (!addOpens.isEmpty()) {
+            reconfigurer.openJavaModules(addOpens, context);
+        }
+        if (!enableNativeAccesses.isEmpty()) {
+            reconfigurer.enableNativeAccess(enableNativeAccesses, context);
+        }
     }
 
 }
