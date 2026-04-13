@@ -27,6 +27,7 @@ import io.quarkus.deployment.steps.ClassTransformingBuildStep;
 import io.quarkus.dev.spi.DevModeType;
 import io.quarkus.dev.spi.HotReplacementSetup;
 import io.quarkus.runner.bootstrap.AugmentActionImpl;
+import io.quarkus.runtime.JVMNativeAccessControl;
 import io.quarkus.runtime.JVMUnsafeWarningsControl;
 import io.quarkus.runtime.Quarkus;
 
@@ -108,6 +109,8 @@ public class IsolatedTestModeMain extends IsolatedDevModeMain {
     public void accept(CuratedApplication o, Map<String, Object> params) {
         // Ensure JVM warnings are suppressed for all dev mode entry points (idempotent)
         JVMUnsafeWarningsControl.disableUnsafeRelatedWarnings();
+        // Enable native access for Quarkus infrastructure (Jansi) before augmentation triggers it (Windows/JDK 24+)
+        JVMNativeAccessControl.enableNativeAccessIfRequired();
 
         System.setProperty("java.nio.channels.DefaultThreadPool.threadFactory",
                 "io.quarkus.dev.io.NioThreadPoolThreadFactory");
