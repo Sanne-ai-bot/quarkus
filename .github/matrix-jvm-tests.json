@@ -44,8 +44,8 @@
         "java-version": 25,
         "java-distribution": "semeru",
         "java-version-gradle": 21,
-        "maven_args": "$JVM_TEST_MAVEN_ARGS",
-        "maven_opts": "-Xmx3g -XX:MaxMetaspaceSize=1g",
+        "maven_args": "$JVM_TEST_MAVEN_ARGS -Dci.jvm.tuning=\"-Xquickstart -Xshareclasses:nonfatal\"",
+        "maven_opts": "-Xmx3g -XX:MaxMetaspaceSize=1g -Xquickstart -Xshareclasses:nonfatal",
         "os-name": "ubuntu-latest",
         "runs-on": false,
         "modules": "-pl\n!docs\n-Dno-test-modules"
@@ -92,8 +92,8 @@
         "tag": "jvm-tests-integration",
         "java-version": 25,
         "java-distribution": "semeru",
-        "maven_args": "$JVM_TEST_MAVEN_ARGS",
-        "maven_opts": "-Xmx3g -XX:MaxMetaspaceSize=1g",
+        "maven_args": "$JVM_TEST_MAVEN_ARGS -Dci.jvm.tuning=\"-Xquickstart -Xshareclasses:nonfatal\"",
+        "maven_opts": "-Xmx3g -XX:MaxMetaspaceSize=1g -Xquickstart -Xshareclasses:nonfatal",
         "runs-on": false,
         "os-name": "ubuntu-latest",
         "modules": "-f\nintegration-tests\n-pl\n!gradle\n-pl\n!maven\n-pl\n!devmode\n-pl\n!devtools"
