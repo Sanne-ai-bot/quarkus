@@ -210,6 +210,8 @@
         <develocity.pts.enabled>false</develocity.pts.enabled>
         <!-- If PTS is active for specific modules -->
         <develocity.pts.active>false</develocity.pts.active>
+        <!-- OpenJ9/Semeru tuning flags, injected by CI for forked test JVMs -->
+        <ci.jvm.tuning></ci.jvm.tuning>
     </properties>
 
     <dependencyManagement>
@@ -507,7 +509,7 @@
                         <!-- the add-opens java.base/java.lang=ALL-UNNAMED is here for
                              org.jboss.JDKSpecific.ThreadAccess.clearThreadLocals() -->
                         <!-- set -XX:+HeapDumpOnOutOfMemoryError to provide some useful debugging info, should this happen -->
-                        <argLine>${jacoco.agent.argLine} -Xmx1500m -XX:+HeapDumpOnOutOfMemoryError -XX:MaxMetaspaceSize=1500m -Djava.io.tmpdir="${project.build.directory}" ${surefire.argLine.additional} --enable-native-access=ALL-UNNAMED --add-opens java.naming/com.sun.naming.internal=ALL-UNNAMED --add-opens java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang.invoke=ALL-UNNAMED</argLine>
+                        <argLine>${ci.jvm.tuning} ${jacoco.agent.argLine} -Xmx1500m -XX:+HeapDumpOnOutOfMemoryError -XX:MaxMetaspaceSize=1500m -Djava.io.tmpdir="${project.build.directory}" ${surefire.argLine.additional} --enable-native-access=ALL-UNNAMED --add-opens java.naming/com.sun.naming.internal=ALL-UNNAMED --add-opens java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang.invoke=ALL-UNNAMED</argLine>
                         <excludedEnvironmentVariables>MAVEN_OPTS</excludedEnvironmentVariables>
                     </configuration>
                 </plugin>
@@ -529,7 +531,7 @@
                             <project.groupId>${project.groupId}</project.groupId>
                         </systemPropertyVariables>
                         <!-- set tmpdir as early as possible because failsafe sets it too late for JDK16 -->
-                        <argLine>-Djava.io.tmpdir="${project.build.directory}" ${failsafe.argLine.additional}</argLine>
+                        <argLine>${ci.jvm.tuning} -Djava.io.tmpdir="${project.build.directory}" ${failsafe.argLine.additional}</argLine>
                         <excludedEnvironmentVariables>MAVEN_OPTS</excludedEnvironmentVariables>
                     </configuration>
                 </plugin>
