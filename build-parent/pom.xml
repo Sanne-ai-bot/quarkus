@@ -1,7 +1,5 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+<?xml version='1.0' encoding='UTF-8'?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <parent>
         <groupId>io.quarkus</groupId>
         <artifactId>quarkus-project</artifactId>
@@ -16,17 +14,17 @@
     <packaging>pom</packaging>
 
     <properties>
-        <!-- Maven plugin versions -->
+        
 
-        <!-- These properties are needed in order for them to be resolvable by the generated projects -->
+        
         <compiler-plugin.version>${version.compiler.plugin}</compiler-plugin.version>
         <kotlin.version>2.4.10</kotlin.version>
-        <ksp-gradle-plugin.version>2.2.10-2.0.2</ksp-gradle-plugin.version> <!-- Kotlin Symbol Processing plugin used in a test -->
+        <ksp-gradle-plugin.version>2.2.10-2.0.2</ksp-gradle-plugin.version> 
         <dokka.version>2.2.0</dokka.version>
 
         <jboss-bridger-plugin.version>1.6.Final</jboss-bridger-plugin.version>
 
-        <!-- Jandex versions -->
+        
         <jandex.version>3.6.0</jandex.version>
         <jandex-gradle-plugin.version>2.3.0</jandex-gradle-plugin.version>
 
@@ -36,31 +34,29 @@
         <jdeparser.version>2.1.0</jdeparser.version>
         <subethasmtp.version>6.0.1</subethasmtp.version>
 
-        <!-- Dev tools -->
+        
         <freemarker.version>2.3.34</freemarker.version>
         <commonmark.version>0.30.0</commonmark.version>
         <jgit.version>7.7.1.202607240634-r</jgit.version>
 
-        <!-- Arquillian BOM -->
+        
         <arquillian.version>1.7.0.Final</arquillian.version>
 
-        <!-- Enable APT by default for Eclipse -->
+        
         <m2e.apt.activation>jdt_apt</m2e.apt.activation>
 
-        <!-- These 2 properties are used in catalog-overrides.json -->
+        
         <minimum-java-version>${maven.compiler.release}</minimum-java-version>
         <recommended-java-version>25</recommended-java-version>
 
-        <!--
-        Supported Maven versions, interpreted as a version range (Also defined in quarkus-enforcer-rules)
-         -->
-        <!-- This version is more permissive than ${maven.min.version} as we usually have more requirements for the Quarkus build itself than for Quarkus projects -->
+        
+        
         <supported-maven-versions>[3.9.0,)</supported-maven-versions>
 
-        <!-- These 2 properties are used by CreateProjectMojo to add the Maven Wrapper -->
+        
         <proposed-maven-version>3.9.16</proposed-maven-version>
         <maven-wrapper.version>3.3.4</maven-wrapper.version>
-        <!-- Supported Gradle versions, interpreted as a version range -->
+        
         <minimum-gradle-version>9.6</minimum-gradle-version>
         <supported-gradle-versions>[9.6,)</supported-gradle-versions>
         <gradle-wrapper.version>9.6.0</gradle-wrapper.version>
@@ -68,12 +64,12 @@
         <quarkus-maven-plugin.version>${project.version}</quarkus-maven-plugin.version>
         <maven-plugin-plugin.version>3.8.1</maven-plugin-plugin.version>
 
-        <!-- MicroProfile TCK versions used to be defined here but have moved to the concrete tck modules -->
+        
 
-        <!-- SELinux access label, used when mounting local volumes into containers in tests -->
+        
         <volume.access.modifier>:Z</volume.access.modifier>
 
-        <!-- Defaults for integration tests -->
+        
         <elasticsearch-server.version>9.4.1</elasticsearch-server.version>
         <elasticsearch.image>docker.io/elastic/elasticsearch:${elasticsearch-server.version}</elasticsearch.image>
         <logstash.image>docker.io/elastic/logstash:${elasticsearch-server.version}</logstash.image>
@@ -84,70 +80,70 @@
         <opensearch.protocol>http</opensearch.protocol>
         <junit-pioneer.version>2.3.0</junit-pioneer.version>
 
-        <!-- Database default versions for `quarkus.datasource.db-version` and images for devservices -->
+        
         <db2.version>12.1</db2.version>
         <db2.image>icr.io/db2_community/db2:${db2.version}.5.0</db2.image>
-        <!-- Default build-time version: latest version at least 2 years old -->
-        <!-- See https://github.com/quarkusio/quarkus/issues/53277 -->
-        <!-- See https://endoflife.date/ibm-db2 -->
+        
+        
+        
         <db2.default.version>12.1</db2.default.version>
         <mariadb.version>12.3</mariadb.version>
         <mariadb.image>docker.io/library/mariadb:${mariadb.version}</mariadb.image>
-        <!-- Default build-time version: latest version at least 2 years old -->
-        <!-- See https://github.com/quarkusio/quarkus/issues/53277 -->
-        <!-- See https://endoflife.date/mariadb -->
+        
+        
+        
         <mariadb.default.version>11.4</mariadb.default.version>
-        <mssql.version>16</mssql.version> <!-- SQL Server 2022 = version 16 -->
+        <mssql.version>16</mssql.version> 
         <mssql.image>mcr.microsoft.com/mssql/server:2025-latest</mssql.image>
-        <!-- Default build-time version: latest version at least 2 years old -->
-        <!-- See https://github.com/quarkusio/quarkus/issues/53277 -->
-        <!-- See https://endoflife.date/mssqlserver -->
+        
+        
+        
         <mssql.default.version>16</mssql.default.version>
         <mssql.image.aarch64>mcr.microsoft.com/azure-sql-edge:latest</mssql.image.aarch64>
         <mysql.version>9.7</mysql.version>
         <mysql.image>docker.io/library/mysql:${mysql.version}</mysql.image>
-        <!-- Default build-time version: latest version at least 2 years old -->
-        <!-- See https://github.com/quarkusio/quarkus/issues/53277 -->
-        <!-- See https://endoflife.date/mysql -->
+        
+        
+        
         <mysql.default.version>8.4</mysql.default.version>
         <oracle.version>23</oracle.version>
         <oracle.image>docker.io/gvenzl/oracle-free:${oracle.version}-slim-faststart</oracle.image>
-        <!-- Default build-time version: latest version at least 2 years old -->
-        <!-- See https://github.com/quarkusio/quarkus/issues/53277 -->
-        <!-- See https://endoflife.date/oracle-database -->
+        
+        
+        
         <oracle.default.version>23</oracle.default.version>
         <postgres.version>18</postgres.version>
         <postgres.image>docker.io/library/postgres:${postgres.version}</postgres.image>
         <postgis.image>docker.io/postgis/postgis:${postgres.version}-3.6</postgis.image>
         <pgvector.image>docker.io/pgvector/pgvector:pg${postgres.version}</pgvector.image>
-        <!-- Default build-time version: latest version at least 2 years old -->
-        <!-- See https://github.com/quarkusio/quarkus/issues/53277 -->
-        <!-- See https://endoflife.date/postgresql -->
+        
+        
+        
         <postgres.default.version>16</postgres.default.version>
 
         <mongo.image>docker.io/library/mongo:8.3</mongo.image>
 
-        <!-- Align various dependencies that are not really part of the bom-->
+        
         <junit4.version>4.13.2</junit4.version>
 
-        <!-- The image to use for tests that run Keycloak -->
+        
         <keycloak.server.version>26.7.1</keycloak.server.version>
         <keycloak.docker.image>quay.io/keycloak/keycloak:${keycloak.server.version}</keycloak.docker.image>
 
         <unboundid-ldap.version>7.0.4</unboundid-ldap.version>
 
         <assertj.version>3.27.7</assertj.version>
-        <!-- Keep in sync with VineflowerDecompiler.DEFAULT_VINEFLOWER_VERSION -->
+        
         <vineflower.version>1.12.0</vineflower.version>
 
         <wiremock.version>3.13.2</wiremock.version>
         <wiremock-maven-plugin.version>7.3.0</wiremock-maven-plugin.version>
 
-        <!-- Artemis test dependencies -->
+        
         <artemis.version>2.55.0</artemis.version>
 
-        <!-- Dev Services Images -->
-        <!-- TODO switch to apache/activemq-artemis to match the artemis version-->
+        
+        
         <amqp.image>quay.io/arkmq-org/arkmq-org-broker:artemis.2.55.0</amqp.image>
         <apicurio-registry.image>quay.io/apicurio/apicurio-registry:3.1.7</apicurio-registry.image>
         <narayana-lra.image>quay.io/jbosstm/lra-coordinator:latest</narayana-lra.image>
@@ -163,59 +159,59 @@
         <kafka.upstream.native.image>docker.io/apache/kafka-native:4.2.0</kafka.upstream.native.image>
         <observability.lgtm.image>docker.io/grafana/otel-lgtm:0.24.0</observability.lgtm.image>
 
-        <!-- Code Coverage Properties-->
-        <jacoco.agent.argLine></jacoco.agent.argLine>
+        
+        <jacoco.agent.argLine />
 
         <asciidoctor-maven-plugin.version>2.0.0</asciidoctor-maven-plugin.version>
         <docker-maven-plugin.version>0.48.1</docker-maven-plugin.version>
         <maven-invoker-plugin.version>3.10.1</maven-invoker-plugin.version>
 
-        <!-- revapi API check -->
+        
         <revapi-maven-plugin.version>0.14.7</revapi-maven-plugin.version>
         <revapi-java-plugin.version>0.26.1</revapi-java-plugin.version>
         <build-helper-plugin.version>3.6.1</build-helper-plugin.version>
         <revapi-reporter-text.version>0.14.5</revapi-reporter-text.version>
         <revapi-reporter-json.version>0.4.5</revapi-reporter-json.version>
-        <!-- Latest release to be used by api-compatibility-check to check backwards compatibility of the Quarkus API. -->
+        
         <revapi.oldVersion>1.6.0.Final</revapi.oldVersion>
         <revapi.newVersion>${project.version}</revapi.newVersion>
-        <!-- severity Possible values: equivalent, nonBreaking, potentiallyBreaking, breaking -->
+        
         <revapi.reportSeverity>nonBreaking</revapi.reportSeverity>
-        <!-- Skip the API checks by default. Let the modules opt in. -->
+        
         <revapi.skip>true</revapi.skip>
-        <!-- By default don't check dependencies -->
+        
         <revapi.checkdeps>true</revapi.checkdeps>
-        <!-- The message that is appended to the end of the plugin error output when the API problems fail the build -->
+        
         <revapi.buildFailureMessage>Run "jbang revapi-update" to update api-changes.xml file and also add the justification for those changes in that file.</revapi.buildFailureMessage>
 
-        <!-- platform properties - this is a floating tag -->
+        
         <platform.quarkus.native.builder-image>mandrel</platform.quarkus.native.builder-image>
 
         <script.extension>sh</script.extension>
         <docker-prune.location>${maven.multiModuleProjectDirectory}/.github/docker-prune.${script.extension}</docker-prune.location>
 
-        <surefire.argLine.additional></surefire.argLine.additional>
+        <surefire.argLine.additional />
         <failsafe.argLine.additional>${surefire.argLine.additional}</failsafe.argLine.additional>
 
-        <!-- google cloud functions invoker-->
+        
         <gcf-invoker.version>2.0.0</gcf-invoker.version>
-        <!-- Jakarta JMS API -->
+        
         <jakarta.jms-api.version>3.1.0</jakarta.jms-api.version>
 
-        <!-- Quarkus Analytics -->
+        
         <properties-maven-plugin.version>1.3.0</properties-maven-plugin.version>
         <quarkus.analytics.disabled>true</quarkus.analytics.disabled>
 
-        <!-- If PTS is enabled at the global level  -->
+        
         <develocity.pts.enabled>false</develocity.pts.enabled>
-        <!-- If PTS is active for specific modules -->
+        
         <develocity.pts.active>false</develocity.pts.active>
-    </properties>
+    <ci.jvm.tuning /></properties>
 
     <dependencyManagement>
         <dependencies>
 
-            <!-- Quarkus Extensions Dependencies are coming from quarkus-bom-deployment (that also imports quarkus-bom) -->
+            
             <dependency>
                 <groupId>io.quarkus</groupId>
                 <artifactId>quarkus-bom</artifactId>
@@ -224,7 +220,7 @@
                 <scope>import</scope>
             </dependency>
 
-            <!-- Dev tools -->
+            
             <dependency>
                 <groupId>io.quarkus</groupId>
                 <artifactId>quarkus-devmode-test-utils</artifactId>
@@ -246,7 +242,7 @@
                 <version>${jgit.version}</version>
             </dependency>
 
-            <!-- Extension processor -->
+            
             <dependency>
                 <groupId>org.jboss.jdeparser</groupId>
                 <artifactId>jdeparser</artifactId>
@@ -258,7 +254,7 @@
                 <version>${javaparser-core.version}</version>
             </dependency>
 
-            <!-- Miscellaneous -->
+            
             <dependency>
                 <groupId>io.quarkus</groupId>
                 <artifactId>quarkus-bootstrap-core</artifactId>
@@ -388,7 +384,7 @@
                 <scope>test</scope>
             </dependency>
 
-            <!-- Artemis test dependencies -->
+            
             <dependency>
                 <groupId>org.apache.artemis</groupId>
                 <artifactId>artemis-server</artifactId>
@@ -490,23 +486,21 @@
                                 <enabled>${develocity.pts.active}</enabled>
                             </predictiveSelection>
                         </properties>
-                        <!-- combine.self suppresses warnings about java.io.tmpdir being defined twice -->
+                        
                         <systemPropertyVariables combine.self="override">
                             <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
                             <maven.home>${maven.home}</maven.home>
                             <maven.repo.local>${settings.localRepository}</maven.repo.local>
                             <maven.settings>${session.request.userSettingsFile.path}</maven.settings>
-                            <!-- some dev tools tests need the following properties -->
+                            
                             <project.version>${project.version}</project.version>
                             <project.groupId>${project.groupId}</project.groupId>
                         </systemPropertyVariables>
-                        <!-- limit the amount of memory surefire can use, 1500m should be plenty-->
-                        <!-- set tmpdir as early as possible because surefire sets it too late for JDK16 -->
-                        <!-- the add-opens java.naming/com.sun.naming.internal is here to allow to clear
-                             the propertiesCache in com.sun.naming.internal.ResourceManager -->
-                        <!-- the add-opens java.base/java.lang=ALL-UNNAMED is here for
-                             org.jboss.JDKSpecific.ThreadAccess.clearThreadLocals() -->
-                        <!-- set -XX:+HeapDumpOnOutOfMemoryError to provide some useful debugging info, should this happen -->
+                        
+                        
+                        
+                        
+                        
                         <argLine>${jacoco.agent.argLine} -Xmx1500m -XX:+HeapDumpOnOutOfMemoryError -XX:MaxMetaspaceSize=1500m -Djava.io.tmpdir="${project.build.directory}" ${surefire.argLine.additional} --enable-native-access=ALL-UNNAMED --add-opens java.naming/com.sun.naming.internal=ALL-UNNAMED --add-opens java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang.invoke=ALL-UNNAMED</argLine>
                         <excludedEnvironmentVariables>MAVEN_OPTS</excludedEnvironmentVariables>
                     </configuration>
@@ -524,11 +518,11 @@
                             <maven.home>${maven.home}</maven.home>
                             <maven.repo.local>${settings.localRepository}</maven.repo.local>
                             <maven.settings>${session.request.userSettingsFile.path}</maven.settings>
-                            <!-- some dev tools tests need the following properties -->
+                            
                             <project.version>${project.version}</project.version>
                             <project.groupId>${project.groupId}</project.groupId>
                         </systemPropertyVariables>
-                        <!-- set tmpdir as early as possible because failsafe sets it too late for JDK16 -->
+                        
                         <argLine>-Djava.io.tmpdir="${project.build.directory}" ${failsafe.argLine.additional}</argLine>
                         <excludedEnvironmentVariables>MAVEN_OPTS</excludedEnvironmentVariables>
                     </configuration>
@@ -572,8 +566,8 @@
                             <phase>${maven-enforcer-plugin.phase}</phase>
                             <configuration>
                                 <rules>
-                                    <banDuplicatePomDependencyVersions/>
-                                    <dependencyConvergence/>
+                                    <banDuplicatePomDependencyVersions />
+                                    <dependencyConvergence />
                                     <externalRules>
                                         <location>classpath:enforcer-rules/quarkus-banned-dependencies.xml</location>
                                     </externalRules>
@@ -626,7 +620,7 @@
                 <plugin>
                     <groupId>org.antlr</groupId>
                     <artifactId>antlr4-maven-plugin</artifactId>
-                    <version>${antlr.version}</version><!-- keep it aligned with the runtime bom-->
+                    <version>${antlr.version}</version>
                 </plugin>
                 <plugin>
                     <groupId>uk.co.automatictester</groupId>
@@ -677,7 +671,7 @@
                         <execution>
                             <id>verify-forbidden-apis</id>
                             <configuration>
-                                <!-- if the used Java version is too new, don't fail, just do nothing: -->
+                                
                                 <failOnUnsupportedJava>false</failOnUnsupportedJava>
                                 <signaturesFiles>
                                     <signaturesFile>${maven.multiModuleProjectDirectory}/.forbiddenapis/banned-signatures-common.txt</signaturesFile>
@@ -848,14 +842,10 @@
                             <kotlin>
                                 <ktfmt>
                                     <style>KOTLINLANG</style>
-                                    <!-- optional, other options are DEFAULT, DROPBOX, GOOGLE and KOTLINLANG -->
+                                    
                                 </ktfmt>
 
-                                <!--
-                                    <ktfmt>
-                                        <style>DEFAULT</style> &lt;!&ndash; optional, other options are DEFAULT, DROPBOX, GOOGLE and KOTLINLANG &ndash;&gt;
-                                    </ktfmt>
-                                -->
+                                
 
                             </kotlin>
                         </configuration>
@@ -893,7 +883,7 @@
                             <outputFormat>html</outputFormat>
                             <externalDocumentationLinks>
                                 <link>
-                                    <!-- Root URL of the generated documentation to link with. The trailing slash is required! -->
+                                    
                                     <url>https://docs.oracle.com/en/java/javase/21/docs/api/</url>
                                 </link>
                             </externalDocumentationLinks>
@@ -924,14 +914,14 @@
             <id>eclipse</id>
             <activation>
                 <property>
-                    <!-- This is a trick to have the profile automatically activated by Eclipse -->
+                    
                     <name>m2e.version</name>
                 </property>
             </activation>
             <build>
                 <pluginManagement>
                     <plugins>
-                        <!--This plugin's configuration is used to store Eclipse m2e settings only. It has no influence on the Maven build itself.-->
+                        
                         <plugin>
                             <groupId>org.eclipse.m2e</groupId>
                             <artifactId>lifecycle-mapping</artifactId>
@@ -954,7 +944,7 @@
                                                 </goals>
                                             </pluginExecutionFilter>
                                             <action>
-                                                <ignore></ignore>
+                                                <ignore />
                                             </action>
                                         </pluginExecution>
                                         <pluginExecution>
@@ -973,7 +963,7 @@
                                                 </goals>
                                             </pluginExecutionFilter>
                                             <action>
-                                                <ignore></ignore>
+                                                <ignore />
                                             </action>
                                         </pluginExecution>
                                         <pluginExecution>
@@ -992,7 +982,7 @@
                                                 </goals>
                                             </pluginExecutionFilter>
                                             <action>
-                                                <ignore></ignore>
+                                                <ignore />
                                             </action>
                                         </pluginExecution>
                                         <pluginExecution>
@@ -1011,7 +1001,7 @@
                                                 </goals>
                                             </pluginExecutionFilter>
                                             <action>
-                                                <ignore></ignore>
+                                                <ignore />
                                             </action>
                                         </pluginExecution>
                                         <pluginExecution>
@@ -1028,7 +1018,7 @@
                                                 </goals>
                                             </pluginExecutionFilter>
                                             <action>
-                                                <ignore></ignore>
+                                                <ignore />
                                             </action>
                                         </pluginExecution>
                                     </pluginExecutions>
@@ -1123,15 +1113,12 @@
                             <newArtifacts>
                                 <artifact>${project.groupId}:${project.artifactId}:${revapi.newVersion}</artifact>
                             </newArtifacts>
-                            <!-- don't fail is false making it possible to have
-                                revapi checks without requiring config files -->
+                            
                             <failOnMissingConfigurationFiles>false</failOnMissingConfigurationFiles>
-                            <!-- Consider changes from the latest .Final version,
-                                not from the latest non-snapshot. -->
+                            
                             <versionFormat>\d+\.\d+\.\d+\.Final</versionFormat>
-                            <!-- By default revapi will check the oldArtifact
-                                against the currently executed build -->
-                            <!-- <checkDependencies>false</checkDependencies> -->
+                            
+                            
                             <analysisConfigurationFiles>
                                 <configurationFile>
                                     <resource>revapi/revapi-configuration.xml</resource>
@@ -1143,9 +1130,7 @@
                                     </roots>
                                 </configurationFile>
                             </analysisConfigurationFiles>
-                            <!-- By default, revapi will only fail the build
-                                 if there are potentially breaking or breaking changes. However, in the report
-                                 we want even non breaking changes to be present. -->
+                            
                             <reportSeverity>nonBreaking</reportSeverity>
                             <failSeverity>potentiallyBreaking</failSeverity>
                             <failBuildOnProblemsFound>true</failBuildOnProblemsFound>
@@ -1155,12 +1140,7 @@
                             <ignoreSuggestionsFile>${project.build.directory}/api-changes-suggestions.xml</ignoreSuggestionsFile>
                             <expandProperties>true</expandProperties>
                         </configuration>
-                        <!-- Running two executions is a workaround to make sure
-                             we get a HTML report in case revapi finds some incompatible changes. The
-                             "check" goal will simply fail the whole build before it could get to the
-                             report. To make sure we always get a HTML report, the "report" goal needs
-                             to be executed before the "check" goal. Once https://github.com/revapi/revapi/issues/11
-                             is fixed it should be possible to use single execution. -->
+                        
                         <executions>
                             <execution>
                                 <id>api-check</id>
@@ -1170,7 +1150,7 @@
                                 <phase>verify</phase>
                             </execution>
                             <execution>
-                                <!-- report can be found in ${build.directory}/site/revapi-report.html -->
+                                
                                 <id>api-report</id>
                                 <goals>
                                     <goal>report</goal>
@@ -1203,8 +1183,8 @@
                 </os>
             </activation>
             <properties>
-                <!-- Podman compatibility. Currently, mac file systems based on Plan 9 does not support SELinux labeling z and Z should not be used. When they transition to use virtiofsd, it should support SELinux labeling, and then we can use it for better container separation on the Mac.-->
-                <volume.access.modifier></volume.access.modifier>
+                
+                <volume.access.modifier />
             </properties>
         </profile>
 
@@ -1216,9 +1196,7 @@
                 </os>
             </activation>
             <properties>
-                <!-- See
-                https://github.com/microsoft/mssql-docker/issues/668 and https://stackoverflow.com/questions/65398641/docker-connect-sql-server-container-non-zero-code-1/66919852#66919852.
-                The MS SQL image segfaults on ARM. Azure Edge is not fully compatible, but it is better than not running the tests at all. -->
+                
                 <mssql.image>${mssql.image.aarch64}</mssql.image>
             </properties>
         </profile>
