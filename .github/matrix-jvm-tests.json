@@ -48,6 +48,7 @@
         "maven_opts": "-Xmx3g -XX:MaxMetaspaceSize=1g",
         "os-name": "ubuntu-latest",
         "runs-on": false,
+        "bisect": "no-flags-baseline",
         "modules": "-pl\n!docs\n-Dno-test-modules"
     },
     {
