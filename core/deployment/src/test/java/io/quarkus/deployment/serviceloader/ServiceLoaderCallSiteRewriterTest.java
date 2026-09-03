@@ -44,17 +44,30 @@ class ServiceLoaderCallSiteRewriterTest {
     }
 
     @Test
-    void escapeToFieldShouldStillBeRewritten() throws IOException {
+    void escapeToFieldShouldNotBeRewritten() throws IOException {
         TransformResult result = transformClass(EscapeToFieldUser.class);
-        assertTrue(result.hasShimCall,
-                "load call is rewritten even when value escapes to field (shim handles fallback at runtime)");
+        assertFalse(result.hasShimCall,
+                "load call must NOT be rewritten when value escapes to field (would cause VerifyError)");
+        assertTrue(result.hasOriginalServiceLoaderCall,
+                "original ServiceLoader.load call should be preserved");
     }
 
     @Test
-    void returnValueShouldStillBeRewritten() throws IOException {
+    void returnValueShouldNotBeRewritten() throws IOException {
         TransformResult result = transformClass(ReturnUser.class);
-        assertTrue(result.hasShimCall,
-                "load call is rewritten even when value is returned (shim handles fallback at runtime)");
+        assertFalse(result.hasShimCall,
+                "load call must NOT be rewritten when value is returned (would cause VerifyError)");
+        assertTrue(result.hasOriginalServiceLoaderCall,
+                "original ServiceLoader.load call should be preserved");
+    }
+
+    @Test
+    void methodArgShouldNotBeRewritten() throws IOException {
+        TransformResult result = transformClass(MethodArgUser.class);
+        assertFalse(result.hasShimCall,
+                "load call must NOT be rewritten when value is passed as method argument");
+        assertTrue(result.hasOriginalServiceLoaderCall,
+                "original ServiceLoader.load call should be preserved");
     }
 
     private TransformResult transformClass(Class<?> clazz) throws IOException {

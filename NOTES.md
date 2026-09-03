@@ -87,11 +87,17 @@
 - Phase 3: ASM rewriter changes INVOKESTATIC/INVOKEVIRTUAL owner + descriptor + frame types
 
 ### Call-site rewriter strategy
-- Single-pass rewrite: ALL ServiceLoader.load/loadInstalled calls are rewritten
-- ALL ServiceLoader.{iterator,stream,findFirst,reload,forEach,spliterator,toString} calls rewritten
-- Frame types and local variable descriptors patched to use shim type
-- Safe because QuarkusServiceLoader has runtime fallback for any situation
-- This is simpler than a flow-sensitive rewriter and handles all patterns correctly
+- Two-pass inputTransformer: analysis pass detects rewritable sites, rewrite pass transforms them
+- Only rewrites ServiceLoader.load calls where the result is DIRECTLY consumed on the stack
+  by a safe method (iterator, stream, findFirst, reload, forEach, spliterator, toString)
+- Call sites where the value is stored to a local (ASTORE), passed as a method argument,
+  stored to a field, or returned are left untouched — avoids VerifyError since ServiceLoader is final
+- Analysis pass uses SKIP_DEBUG|SKIP_FRAMES for speed; if no rewritable sites found, returns
+  original bytes unchanged (no COMPUTE_FRAMES, avoiding frame recomputation errors)
+- Common pattern: `for (Foo f : ServiceLoader.load(Foo.class))` compiles to
+  `load → iterator` (direct consumption), so most for-each loops are rewritten
+- Pattern NOT rewritten: `ServiceLoader<X> sl = ServiceLoader.load(X.class); doSomething(sl);`
+  — the ASTORE between load and use makes it non-rewritable
 
 ## Open Questions
 - Ordering: build step collects service files via TCCL enumeration which may not exactly match
@@ -106,8 +112,23 @@
   ServiceLoader iterators are not thread-safe in the JDK either, and our usage pattern (one
   QuarkusServiceLoader per call site) means concurrent access is unlikely.
 
-## Phase 0: Baseline Measurements
-(To be filled after measurement — run `./measure-serviceloader.sh`)
+## Phase 0 & 5: Measurements (jpa-h2 integration test)
 
-## Phase 5: Final Measurements
-(To be filled after measurement — run `./measure-serviceloader.sh --with-flag`)
+### Build-time (Quarkus augmentation)
+- Baseline (flag off): 1349ms
+- With short-circuit (flag on): 1585ms (+236ms build overhead)
+  - 40 APP_ONLY service types short-circuited
+  - 6 JDK_INVOLVED types (fallback to real ServiceLoader)
+  - 54 candidate classes scanned for call-site rewriting
+
+### Call-site rewriting coverage
+- Direct-consumption pattern (`ServiceLoader.load(X.class).iterator()` etc.): rewritten
+- Store-then-use pattern (`sl = ServiceLoader.load(X.class); for(x:sl)`): NOT rewritten (safe skip)
+- Method argument pattern (`helper(ServiceLoader.load(...))`): NOT rewritten (would cause VerifyError)
+- Escape patterns (field store, return): NOT rewritten (correct behavior)
+
+### Runtime
+- jpa-h2 `JPAFunctionalityTest` passes with flag enabled (no VerifyError, no regressions)
+- Note: boot-time speedup from registry lookups is modest for jpa-h2 (ServiceLoader is not the
+  dominant boot cost for this app). The benefit is more significant for apps with many ServiceLoader
+  calls during bootstrap, particularly those loading Hibernate/SmallRye/MicroProfile SPIs.

@@ -26,12 +26,15 @@ import org.jboss.jandex.ClassInfo;
 import org.jboss.jandex.DotName;
 import org.jboss.jandex.IndexView;
 import org.jboss.logging.Logger;
+import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
+import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
 import io.quarkus.deployment.BootstrapConfig;
 import io.quarkus.deployment.GeneratedClassGizmoAdaptor;
+import io.quarkus.deployment.QuarkusClassWriter;
 import io.quarkus.deployment.annotations.BuildProducer;
 import io.quarkus.deployment.annotations.BuildStep;
 import io.quarkus.deployment.builditem.BytecodeTransformerBuildItem;
@@ -509,7 +512,7 @@ public class ServiceLoaderShortCircuitProcessor {
             bytecodeTransformers.produce(
                     new BytecodeTransformerBuildItem.Builder()
                             .setClassToTransform(className)
-                            .setVisitorFunction(new ServiceLoaderCallSiteRewriter())
+                            .setInputTransformer(new ServiceLoaderInputTransformer())
                             .setRequireConstPoolEntry(Set.of(SERVICE_LOADER_CLASS))
                             .setContinueOnFailure(true)
                             .build());
@@ -592,10 +595,131 @@ public class ServiceLoaderShortCircuitProcessor {
     }
 
     /**
-     * ASM visitor that rewrites ServiceLoader.load/loadInstalled call sites to use QuarkusServiceLoader.
+     * Input transformer that rewrites ServiceLoader call sites.
      * <p>
-     * Conservative: only rewrites call sites where every use of the ServiceLoader value is
-     * a known-safe method invocation (iterator, stream, findFirst, reload, forEach, spliterator, toString).
+     * Uses a two-pass approach:
+     * Pass 1 (analysis): scans for ServiceLoader.load calls that are directly consumed
+     * by a safe method. Returns the original bytes unchanged if no rewritable sites exist.
+     * Pass 2 (rewrite): applies the rewrite only when pass 1 found rewritable sites.
+     * <p>
+     * This avoids COMPUTE_FRAMES for classes with no rewritable sites, preventing
+     * VerifyError from incorrect frame computation in complex class hierarchies.
+     */
+    static class ServiceLoaderInputTransformer implements BiFunction<String, byte[], byte[]> {
+
+        @Override
+        public byte[] apply(String className, byte[] originalBytes) {
+            ClassReader analysisReader = new ClassReader(originalBytes);
+            boolean[] hasRewritableSite = { false };
+            analysisReader.accept(new ClassVisitor(Opcodes.ASM9) {
+                @Override
+                public MethodVisitor visitMethod(int access, String name, String descriptor,
+                        String signature, String[] exceptions) {
+                    return new AnalysisMethodVisitor(hasRewritableSite, className, name);
+                }
+            }, ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
+
+            if (!hasRewritableSite[0]) {
+                return originalBytes;
+            }
+
+            ClassReader reader = new ClassReader(originalBytes);
+            QuarkusClassWriter writer = new QuarkusClassWriter(reader,
+                    ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
+            ClassVisitor rewriter = new ClassVisitor(Opcodes.ASM9, writer) {
+                @Override
+                public MethodVisitor visitMethod(int access, String name, String descriptor,
+                        String signature, String[] exceptions) {
+                    MethodVisitor mv = super.visitMethod(access, name, descriptor, signature, exceptions);
+                    return new SafeMethodRewriter(mv, className, name);
+                }
+            };
+            reader.accept(rewriter, 0);
+            return writer.toByteArray();
+        }
+    }
+
+    /**
+     * Analysis-only visitor that checks if a method has any ServiceLoader.load call
+     * immediately followed by a safe consumer method.
+     */
+    static class AnalysisMethodVisitor extends MethodVisitor {
+
+        private final boolean[] hasRewritableSite;
+        private final String className;
+        private final String methodName;
+        private boolean pendingLoad;
+
+        AnalysisMethodVisitor(boolean[] hasRewritableSite, String className, String methodName) {
+            super(Opcodes.ASM9);
+            this.hasRewritableSite = hasRewritableSite;
+            this.className = className;
+            this.methodName = methodName;
+        }
+
+        @Override
+        public void visitMethodInsn(int opcode, String owner, String name, String descriptor, boolean isInterface) {
+            if (opcode == Opcodes.INVOKESTATIC && owner.equals(SERVICE_LOADER_CLASS)
+                    && (name.equals("load") || name.equals("loadInstalled"))) {
+                pendingLoad = true;
+                return;
+            }
+            if (pendingLoad) {
+                if ((opcode == Opcodes.INVOKEVIRTUAL && owner.equals(SERVICE_LOADER_CLASS)
+                        && REWRITABLE_SL_METHODS.contains(name))
+                        || (opcode == Opcodes.INVOKEINTERFACE && owner.equals("java/lang/Iterable")
+                                && REWRITABLE_ITERABLE_METHODS.contains(name))) {
+                    hasRewritableSite[0] = true;
+                    LOG.debugf("Found rewritable ServiceLoader call site in %s.%s", className, methodName);
+                }
+                pendingLoad = false;
+            }
+        }
+
+        @Override
+        public void visitVarInsn(int opcode, int varIndex) {
+            pendingLoad = false;
+        }
+
+        @Override
+        public void visitInsn(int opcode) {
+            pendingLoad = false;
+        }
+
+        @Override
+        public void visitTypeInsn(int opcode, String type) {
+            pendingLoad = false;
+        }
+
+        @Override
+        public void visitFieldInsn(int opcode, String owner, String name, String descriptor) {
+            pendingLoad = false;
+        }
+
+        @Override
+        public void visitJumpInsn(int opcode, org.objectweb.asm.Label label) {
+            pendingLoad = false;
+        }
+
+        @Override
+        public void visitIntInsn(int opcode, int operand) {
+            pendingLoad = false;
+        }
+
+        @Override
+        public void visitLdcInsn(Object value) {
+            pendingLoad = false;
+        }
+    }
+
+    /**
+     * ASM rewriter for ServiceLoader call sites (also used in unit tests via the BiFunction wrapper).
+     * <p>
+     * Only rewrites {@code ServiceLoader.load/loadInstalled} calls where the returned value
+     * is immediately consumed by a safe zero-argument method ({@code iterator}, {@code stream},
+     * {@code findFirst}, etc.) — no ASTORE in between. This guarantees the rewritten type
+     * ({@code QuarkusServiceLoader}) never escapes to a context expecting {@code ServiceLoader},
+     * avoiding VerifyError (since ServiceLoader is final and cannot be extended).
      */
     static class ServiceLoaderCallSiteRewriter implements BiFunction<String, ClassVisitor, ClassVisitor> {
 
@@ -606,30 +730,25 @@ public class ServiceLoaderShortCircuitProcessor {
                 public MethodVisitor visitMethod(int access, String name, String descriptor,
                         String signature, String[] exceptions) {
                     MethodVisitor mv = super.visitMethod(access, name, descriptor, signature, exceptions);
-                    return new ServiceLoaderMethodRewriter(mv, className, name);
+                    return new SafeMethodRewriter(mv, className, name);
                 }
             };
         }
     }
 
     /**
-     * Method-level visitor that performs the actual rewrite.
-     * <p>
-     * Strategy: for each INVOKESTATIC to ServiceLoader.load* methods, rewrite the owner to
-     * QuarkusServiceLoader and the return type to QuarkusServiceLoader. Then rewrite subsequent
-     * INVOKEVIRTUAL calls on the returned ServiceLoader to use QuarkusServiceLoader.
-     * <p>
-     * This is a simplified single-pass rewrite: we rewrite ALL ServiceLoader.load calls and
-     * ALL ServiceLoader method calls. The QuarkusServiceLoader shim handles the fallback
-     * at runtime, so even if a value escapes to somewhere unexpected, the shim will still work
-     * (it implements Iterable and has all the same methods).
+     * Method-level visitor that buffers a pending {@code ServiceLoader.load} call and only
+     * emits the rewritten version if the very next real instruction is a safe consumer.
      */
-    static class ServiceLoaderMethodRewriter extends MethodVisitor {
+    static class SafeMethodRewriter extends MethodVisitor {
 
         private final String className;
         private final String methodName;
+        private boolean pendingLoadRewrite;
+        private String pendingLoadName;
+        private String pendingLoadDesc;
 
-        ServiceLoaderMethodRewriter(MethodVisitor delegate, String className, String methodName) {
+        SafeMethodRewriter(MethodVisitor delegate, String className, String methodName) {
             super(Opcodes.ASM9, delegate);
             this.className = className;
             this.methodName = methodName;
@@ -637,21 +756,43 @@ public class ServiceLoaderShortCircuitProcessor {
 
         @Override
         public void visitMethodInsn(int opcode, String owner, String name, String descriptor, boolean isInterface) {
-            if (opcode == Opcodes.INVOKESTATIC && owner.equals(SERVICE_LOADER_CLASS)) {
-                if (name.equals("load") || name.equals("loadInstalled")) {
-                    String newDescriptor = descriptor.replace(
-                            "Ljava/util/ServiceLoader;",
-                            "L" + SHIM_CLASS + ";");
-                    LOG.debugf("Rewriting ServiceLoader.%s in %s.%s", name, className, methodName);
-                    super.visitMethodInsn(opcode, SHIM_CLASS, name, newDescriptor, false);
-                    return;
-                }
+            if (opcode == Opcodes.INVOKESTATIC && owner.equals(SERVICE_LOADER_CLASS)
+                    && (name.equals("load") || name.equals("loadInstalled"))) {
+                flushPending();
+                pendingLoadRewrite = true;
+                pendingLoadName = name;
+                pendingLoadDesc = descriptor;
+                return;
             }
 
-            if (opcode == Opcodes.INVOKEVIRTUAL && owner.equals(SERVICE_LOADER_CLASS)) {
-                if (REWRITABLE_SL_METHODS.contains(name)) {
+            if (pendingLoadRewrite) {
+                if (opcode == Opcodes.INVOKEVIRTUAL && owner.equals(SERVICE_LOADER_CLASS)
+                        && REWRITABLE_SL_METHODS.contains(name)) {
+                    String newLoadDesc = pendingLoadDesc.replace(
+                            "Ljava/util/ServiceLoader;", "L" + SHIM_CLASS + ";");
+                    LOG.debugf("Rewriting ServiceLoader.%s -> %s in %s.%s",
+                            pendingLoadName, name, className, methodName);
+                    super.visitMethodInsn(Opcodes.INVOKESTATIC, SHIM_CLASS,
+                            pendingLoadName, newLoadDesc, false);
                     super.visitMethodInsn(opcode, SHIM_CLASS, name, descriptor, false);
+                    pendingLoadRewrite = false;
                     return;
+                } else if (opcode == Opcodes.INVOKEINTERFACE
+                        && owner.equals("java/lang/Iterable")
+                        && REWRITABLE_ITERABLE_METHODS.contains(name)) {
+                    String newLoadDesc = pendingLoadDesc.replace(
+                            "Ljava/util/ServiceLoader;", "L" + SHIM_CLASS + ";");
+                    LOG.debugf("Rewriting ServiceLoader.%s -> Iterable.%s in %s.%s",
+                            pendingLoadName, name, className, methodName);
+                    super.visitMethodInsn(Opcodes.INVOKESTATIC, SHIM_CLASS,
+                            pendingLoadName, newLoadDesc, false);
+                    super.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
+                    pendingLoadRewrite = false;
+                    return;
+                } else {
+                    LOG.debugf("SKIP rewrite: ServiceLoader.%s escapes to %s.%s in %s.%s",
+                            pendingLoadName, owner, name, className, methodName);
+                    emitOriginalLoad();
                 }
             }
 
@@ -659,44 +800,84 @@ public class ServiceLoaderShortCircuitProcessor {
         }
 
         @Override
-        public void visitTypeInsn(int opcode, String type) {
-            if (opcode == Opcodes.CHECKCAST && type.equals(SERVICE_LOADER_CLASS)) {
-                super.visitTypeInsn(opcode, SHIM_CLASS);
-                return;
+        public void visitVarInsn(int opcode, int varIndex) {
+            if (pendingLoadRewrite) {
+                LOG.debugf("SKIP rewrite: ServiceLoader.%s stored to local %d in %s.%s",
+                        pendingLoadName, varIndex, className, methodName);
+                emitOriginalLoad();
             }
+            super.visitVarInsn(opcode, varIndex);
+        }
+
+        @Override
+        public void visitInsn(int opcode) {
+            flushPending();
+            super.visitInsn(opcode);
+        }
+
+        @Override
+        public void visitTypeInsn(int opcode, String type) {
+            flushPending();
             super.visitTypeInsn(opcode, type);
         }
 
         @Override
-        public void visitFrame(int type, int numLocal, Object[] local, int numStack, Object[] stack) {
-            super.visitFrame(type, numLocal, replaceFrameTypes(local), numStack, replaceFrameTypes(stack));
+        public void visitFieldInsn(int opcode, String owner, String name, String descriptor) {
+            flushPending();
+            super.visitFieldInsn(opcode, owner, name, descriptor);
         }
 
         @Override
-        public void visitLocalVariable(String name, String descriptor, String signature,
-                org.objectweb.asm.Label start, org.objectweb.asm.Label end, int index) {
-            String newDesc = descriptor.replace(
-                    "Ljava/util/ServiceLoader;", "L" + SHIM_CLASS + ";");
-            String newSig = signature != null
-                    ? signature.replace("Ljava/util/ServiceLoader;", "L" + SHIM_CLASS + ";")
-                    : null;
-            super.visitLocalVariable(name, newDesc, newSig, start, end, index);
+        public void visitJumpInsn(int opcode, org.objectweb.asm.Label label) {
+            flushPending();
+            super.visitJumpInsn(opcode, label);
         }
 
-        private static Object[] replaceFrameTypes(Object[] types) {
-            if (types == null) {
-                return null;
+        @Override
+        public void visitLabel(org.objectweb.asm.Label label) {
+            super.visitLabel(label);
+        }
+
+        @Override
+        public void visitLineNumber(int line, org.objectweb.asm.Label start) {
+            super.visitLineNumber(line, start);
+        }
+
+        @Override
+        public void visitLdcInsn(Object value) {
+            flushPending();
+            super.visitLdcInsn(value);
+        }
+
+        @Override
+        public void visitIntInsn(int opcode, int operand) {
+            flushPending();
+            super.visitIntInsn(opcode, operand);
+        }
+
+        @Override
+        public void visitFrame(int type, int numLocal, Object[] local, int numStack, Object[] stack) {
+            super.visitFrame(type, numLocal, local, numStack, stack);
+        }
+
+        @Override
+        public void visitEnd() {
+            flushPending();
+            super.visitEnd();
+        }
+
+        private void emitOriginalLoad() {
+            super.visitMethodInsn(Opcodes.INVOKESTATIC, SERVICE_LOADER_CLASS,
+                    pendingLoadName, pendingLoadDesc, false);
+            pendingLoadRewrite = false;
+        }
+
+        private void flushPending() {
+            if (pendingLoadRewrite) {
+                LOG.debugf("SKIP rewrite: ServiceLoader.%s not directly consumed in %s.%s",
+                        pendingLoadName, className, methodName);
+                emitOriginalLoad();
             }
-            Object[] result = null;
-            for (int i = 0; i < types.length; i++) {
-                if (SERVICE_LOADER_CLASS.equals(types[i])) {
-                    if (result == null) {
-                        result = types.clone();
-                    }
-                    result[i] = SHIM_CLASS;
-                }
-            }
-            return result != null ? result : types;
         }
     }
 }
