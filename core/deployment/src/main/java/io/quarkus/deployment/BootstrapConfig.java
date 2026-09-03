@@ -62,6 +62,14 @@ public interface BootstrapConfig {
     @WithDefault("error")
     MisalignedPlatformImports misalignedPlatformImports();
 
+    /**
+     * If set to true, ServiceLoader resolution will be short-circuited at build time.
+     * The provider table is computed during augmentation and call sites are rewritten to avoid
+     * runtime classpath scanning. Only applies to fast-jar (non-mutable) package types.
+     */
+    @WithDefault("false")
+    boolean serviceLoaderShortCircuit();
+
     enum MisalignedPlatformImports {
         ERROR,
         WARN,
