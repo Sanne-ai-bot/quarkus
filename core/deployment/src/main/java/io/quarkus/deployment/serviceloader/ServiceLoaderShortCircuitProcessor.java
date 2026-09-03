@@ -529,6 +529,18 @@ public class ServiceLoaderShortCircuitProcessor {
         }
     }
 
+    private static final Set<String> EXCLUDED_PACKAGES = Set.of(
+            "io.quarkus.runtime.serviceloader.");
+
+    private static boolean isExcluded(String className) {
+        for (String pkg : EXCLUDED_PACKAGES) {
+            if (className.startsWith(pkg)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private Set<String> findCandidateClasses(CurateOutcomeBuildItem curateOutcome) {
         Set<String> candidates = new HashSet<>();
         Set<String> searchFor = Set.of(SERVICE_LOADER_CLASS);
@@ -541,7 +553,9 @@ public class ServiceLoaderShortCircuitProcessor {
                         byte[] classBytes = Files.readAllBytes(visit.getPath());
                         if (ConstPoolScanner.constPoolEntryPresent(classBytes, searchFor)) {
                             String className = path.substring(0, path.length() - 6).replace('/', '.');
-                            candidates.add(className);
+                            if (!isExcluded(className)) {
+                                candidates.add(className);
+                            }
                         }
                     } catch (IOException e) {
                         // skip
@@ -561,7 +575,9 @@ public class ServiceLoaderShortCircuitProcessor {
                                     String relative = appRoot.relativize(p).toString();
                                     String className = relative.substring(0, relative.length() - 6)
                                             .replace('/', '.').replace('\\', '.');
-                                    candidates.add(className);
+                                    if (!isExcluded(className)) {
+                                        candidates.add(className);
+                                    }
                                 }
                             } catch (IOException e) {
                                 // skip
