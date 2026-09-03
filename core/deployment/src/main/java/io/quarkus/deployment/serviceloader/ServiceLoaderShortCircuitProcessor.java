@@ -650,5 +650,37 @@ public class ServiceLoaderShortCircuitProcessor {
             }
             super.visitTypeInsn(opcode, type);
         }
+
+        @Override
+        public void visitFrame(int type, int numLocal, Object[] local, int numStack, Object[] stack) {
+            super.visitFrame(type, numLocal, replaceFrameTypes(local), numStack, replaceFrameTypes(stack));
+        }
+
+        @Override
+        public void visitLocalVariable(String name, String descriptor, String signature,
+                org.objectweb.asm.Label start, org.objectweb.asm.Label end, int index) {
+            String newDesc = descriptor.replace(
+                    "Ljava/util/ServiceLoader;", "L" + SHIM_CLASS + ";");
+            String newSig = signature != null
+                    ? signature.replace("Ljava/util/ServiceLoader;", "L" + SHIM_CLASS + ";")
+                    : null;
+            super.visitLocalVariable(name, newDesc, newSig, start, end, index);
+        }
+
+        private static Object[] replaceFrameTypes(Object[] types) {
+            if (types == null) {
+                return null;
+            }
+            Object[] result = null;
+            for (int i = 0; i < types.length; i++) {
+                if (SERVICE_LOADER_CLASS.equals(types[i])) {
+                    if (result == null) {
+                        result = types.clone();
+                    }
+                    result[i] = SHIM_CLASS;
+                }
+            }
+            return result != null ? result : types;
+        }
     }
 }

@@ -23,7 +23,9 @@ public class QuarkusServiceLoader<S> implements Iterable<S> {
     private static final String RUNNER_CL_NAME = "io.quarkus.bootstrap.runner.RunnerClassLoader";
 
     private static final String RECORD_PROPERTY = "quarkus.serviceloader.record";
+    private static final String VERIFY_PROPERTY = "quarkus.serviceloader.verify";
     private static final PrintStream RECORD_OUT;
+    private static final boolean VERIFY;
     private static volatile Method registryMethod;
     private static volatile boolean registryResolved;
 
@@ -38,6 +40,7 @@ public class QuarkusServiceLoader<S> implements Iterable<S> {
             }
         }
         RECORD_OUT = out;
+        VERIFY = Boolean.getBoolean(VERIFY_PROPERTY);
     }
 
     private final Class<S> service;
@@ -132,6 +135,9 @@ public class QuarkusServiceLoader<S> implements Iterable<S> {
             recordFallback("unknown type");
             return null;
         }
+        if (VERIFY) {
+            verifyAgainstRealServiceLoader(providers);
+        }
         cachedProviders = providers;
         return providers;
     }
@@ -175,6 +181,36 @@ public class QuarkusServiceLoader<S> implements Iterable<S> {
             }
             RECORD_OUT.println(sb);
             RECORD_OUT.flush();
+        }
+    }
+
+    private void verifyAgainstRealServiceLoader(List<ServiceLoader.Provider<S>> registryProviders) {
+        try {
+            ServiceLoader<S> real = ServiceLoader.load(service, classLoader);
+            List<Class<?>> realTypes = real.stream()
+                    .map(ServiceLoader.Provider::type)
+                    .collect(java.util.stream.Collectors.toList());
+            List<Class<?>> registryTypes = registryProviders.stream()
+                    .map(p -> {
+                        try {
+                            return (Class<?>) p.type();
+                        } catch (Exception e) {
+                            return null;
+                        }
+                    })
+                    .collect(java.util.stream.Collectors.toList());
+
+            if (!realTypes.equals(registryTypes)) {
+                System.err.println("VERIFY MISMATCH for " + service.getName());
+                System.err.println("  Registry: " + registryTypes);
+                System.err.println("  Real:     " + realTypes);
+                throw new AssertionError("ServiceLoader registry mismatch for " + service.getName()
+                        + ": registry=" + registryTypes + ", real=" + realTypes);
+            }
+        } catch (AssertionError e) {
+            throw e;
+        } catch (Exception e) {
+            System.err.println("VERIFY ERROR for " + service.getName() + ": " + e);
         }
     }
 
