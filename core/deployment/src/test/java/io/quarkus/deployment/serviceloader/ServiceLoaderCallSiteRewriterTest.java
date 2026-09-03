@@ -43,6 +43,20 @@ class ServiceLoaderCallSiteRewriterTest {
         assertTrue(result.hasShimCall);
     }
 
+    @Test
+    void escapeToFieldShouldStillBeRewritten() throws IOException {
+        TransformResult result = transformClass(EscapeToFieldUser.class);
+        assertTrue(result.hasShimCall,
+                "load call is rewritten even when value escapes to field (shim handles fallback at runtime)");
+    }
+
+    @Test
+    void returnValueShouldStillBeRewritten() throws IOException {
+        TransformResult result = transformClass(ReturnUser.class);
+        assertTrue(result.hasShimCall,
+                "load call is rewritten even when value is returned (shim handles fallback at runtime)");
+    }
+
     private TransformResult transformClass(Class<?> clazz) throws IOException {
         String resourceName = clazz.getName().replace('.', '/') + ".class";
         byte[] original;
