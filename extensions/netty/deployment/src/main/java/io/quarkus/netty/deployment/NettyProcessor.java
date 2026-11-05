@@ -172,17 +172,12 @@ class NettyProcessor {
     @BuildStep
     NativeImageConfigBuildItem configureUnsafeAccess(
             BuildProducer<ReflectiveMethodBuildItem> reflectiveMethods,
-            BuildProducer<ReflectiveFieldBuildItem> reflectiveFields,
             BuildProducer<ModuleOpenBuildItem> moduleOpenBuildItem) {
 
         reflectiveMethods.produce(
                 new ReflectiveMethodBuildItem("Reflectively accessed through Netty's PlatformDependent0.",
                         "jdk.internal.misc.Unsafe", "allocateUninitializedArray",
                         new String[] { Class.class.getName(), int.class.getName() }));
-
-        reflectiveFields.produce(
-                new ReflectiveFieldBuildItem("Reflectively accessed through Netty's PlatformDependent0.",
-                        "java.nio.Bits", "UNSAFE_SET_THRESHOLD"));
 
         // Enables Netty's PlatformDependent0 and PlatformDependent to access java.nio, e.g. java.nio.Bits
         // It's potentially problematic regarding build-time and run-time inited JDK parts.
@@ -192,9 +187,7 @@ class NettyProcessor {
         moduleOpenBuildItem.produce(
                 new ModuleOpenBuildItem("java.base", "io.netty.transport", "sun.nio.ch"));
 
-        final NativeImageConfigBuildItem.Builder builder = NativeImageConfigBuildItem.builder()
-                .addNativeImageSystemProperty("io.netty.tryReflectionSetAccessible", "true");
-        return builder.build();
+        return NativeImageConfigBuildItem.builder().build();
     }
 
     @BuildStep
