@@ -163,14 +163,11 @@ class NettyProcessor {
     }
 
     /**
-     * <a href="https://openjdk.org/jeps/471">JEP 471</a> locks down access to sun.misc.Unsafe, Netty needs to adapt
-     * to this to maintain its efficiency. As this work progresses in upstream Netty to handle this better automatically, we can
-     * already apply the following recommendations by the Netty team. See also
+     * <a href="https://openjdk.org/jeps/471">JEP 471</a> locks down access to sun.misc.Unsafe. Netty falls back to
+     * reflection for the code paths this affects, so enable that reflection instead of letting Netty fall back
+     * further to its slower, non-Unsafe code paths. See also
      * <a href="https://github.com/quarkusio/quarkus/issues/39907">#39907</a> and
      * <a href="https://netty.io/wiki/java-24-and-sun.misc.unsafe.html">Java 24 and sun.misc.unsafe</a>.
-     * </p>
-     * Unfortunately, "--sun-misc-unsafe-memory-access=allow" should also be set for Java runtime, but it can't be applied
-     * automatically as the JAR Manifest format doesn't allow setting such an option.
      */
     @BuildStep
     NativeImageConfigBuildItem configureUnsafeAccess(
@@ -196,8 +193,7 @@ class NettyProcessor {
                 new ModuleOpenBuildItem("java.base", "io.netty.transport", "sun.nio.ch"));
 
         final NativeImageConfigBuildItem.Builder builder = NativeImageConfigBuildItem.builder()
-                .addNativeImageSystemProperty("io.netty.tryReflectionSetAccessible", "true")
-                .addNativeImageSystemProperty("io.netty.noUnsafe", "true");
+                .addNativeImageSystemProperty("io.netty.tryReflectionSetAccessible", "true");
         return builder.build();
     }
 
