@@ -28,6 +28,9 @@ public interface NettyBuildTimeConfig {
      * More details on https://programmer.group/pool-area-of-netty-memory-pool.html.
      *
      * @see io.netty.buffer.PooledByteBufAllocator
+     * @deprecated This property has no effect on the default allocator since Netty 4.2
+     *             ({@link io.netty.buffer.AdaptiveByteBufAllocator}).
      */
+    @Deprecated(since = "4.0")
     OptionalInt allocatorMaxOrder();
 }
