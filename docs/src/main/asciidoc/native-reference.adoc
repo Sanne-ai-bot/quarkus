@@ -105,6 +105,17 @@ To build Quarkus native with epsilon GC, pass the following argument at build ti
 For information about options to control maximum heap size, young space, and other typical use cases found in the JVM, see the link:https://www.graalvm.org/{graalvm-docs-version}/reference-manual/native-image/optimizations-and-performance/MemoryManagement[GraalVM Memory Management] guide.
 Setting the maximum heap size, either as a percentage or an explicit value, is generally recommended.
 
+[[netty-unsafe]]
+=== Netty Direct Buffer Allocation and `sun.misc.Unsafe`
+Native executables are built with Netty's use of `sun.misc.Unsafe` disabled (`io.netty.noUnsafe=true`), set unconditionally by the `quarkus-netty` extension.
+This follows the Netty project's own recommendation for applications affected by https://openjdk.org/jeps/471[JEP 471] (the JDK 24+ lockdown of `sun.misc.Unsafe` memory access) -- see Netty's https://netty.io/wiki/java-24-and-sun.misc.unsafe.html[Java 24 and sun.misc.Unsafe] wiki page and link:https://github.com/quarkusio/quarkus/issues/39907[quarkusio/quarkus#39907].
+
+With `Unsafe` disabled, Netty falls back to its non-`Unsafe` code paths for direct buffer allocation and access, for example reflection-based `DirectByteBuffer` construction and bounds-checked array access instead of raw memory offsets.
+These fallback paths are generally slower than Netty's `Unsafe` fast paths.
+A JVM-mode build of the same application still uses `Unsafe` by default, so an application that moves a lot of data through Netty buffers (proxies, HTTP/2, gRPC) may see a different buffer allocation and copy performance profile in native mode than it does on the JVM.
+
+This setting is applied unconditionally at build time and is not currently exposed as a Quarkus configuration property.
+
 [[gc-logging]]
 === GC Logging
 Multiple options exist to print information about garbage collection cycles, depending on the level of detail required.
